@@ -1,0 +1,119 @@
+---
+title: "Motor Trend: Automatic vs Manual for Gas Mileage"
+author: "Nikolai Alexander"
+output: pdf_document
+---
+
+#Executive Summary
+
+This study concludes that a manual transmission has 1.8 mpg more gas mileage that an automatic transmission with a 2.45 uncertaintly, keeping all other variables static. At first, we observed the correlation between transmission and gas mileage, ignoring all other variables; however, we only manages to fit 36% of the regression model. We then observed *mpg*'s correlation with number of cylinders, weight, displacement, and horsepower. Comparing these with the transmission gave us a 86.6% fit of the regression model, allowing us to come to our conclusion.
+
+#Analysis of Data
+
+### Gathering the Data
+
+We are observing the *mtcars* data set, in compare gas mileage for **manual** transmission and **automatic** transmission for cars. So let's first look at the data set.
+
+```{r load_data}
+data("mtcars")
+head(mtcars)
+```
+
+```{r check_class}
+sapply(mtcars, class)
+```
+
+As we can see, the class of all columns in the list are *numeric*. We want the categorical data (number of cylinders, transmission type, gear, etc) to be *factor*s to efficiently work with the data.
+
+###Manipulating the Data
+```{r change class}
+for(i in c(2,8:11)){
+  mtcars[,i] <- as.factor(mtcars[,i])
+}
+
+sapply(mtcars, class)
+```
+
+We also would like *am* to be labled as **automatic** (0) or **manual** (1), for simplicity.
+```{r a_m_label}
+mtcars$am <- factor(mtcars$am,levels=c(0,1),labels=c("Automatic", "Manual"))
+
+head(mtcars)
+```
+
+###Hypothesis
+Now that the data is in the form that we want, we can start analysing the correlation between transmission (*am*) and *mpg*. From observing a boxplot comparison of the transmission types (*Figure 1, Appendix A*), we hypothesize a very apparent increase in *mpg* when using an **manual** transmission. However, we must begin using Regression Analysis to prove this hypothesis futher.
+
+#Regression Models
+
+###T-Test
+We can begin proving the strength of our hypothesis by using a t-test
+
+We can separate the data by creating 2 subsets for **automatic** and **manual** transmissions
+```{r subset}
+auto <- mtcars[mtcars$am == "Automatic",]
+manu <- mtcars[mtcars$am == "Manual",]
+```
+
+Now onto the t-test...
+```{r t_test}
+ttest <- t.test(auto$mpg, manu$mpg)
+ttest
+```
+
+We found the *p-value* to be **`r ttest$p.value`**, which is well under the maximum accepted p-value of **0.05**. Therefore, our hypothesis is valid.
+
+###Simple Linear Regression
+
+We can quantify our data using a simple linear model
+
+```{r SLM}
+slm <- summary(lm(mpg ~ am, data = mtcars))
+slm
+```
+
+For this linear model, we can see that *Beta0*, or the estimate of mpg for an automatic transmission, is **`r slm$coef[1,1]`** and *Beta1*, or the difference in mpg between automatic and manual transmissions, is **`r slm$coef[2,1]`**. The *p-value* is **`r slm$coef[2,4]`**, showing that this correlation is significant. However, R-squared is only **`r slm$r.squared`**, meaning this linear model only fits 36% of the regression line. We can find a better fitted line by looking at the other variables
+
+###Multivariable Regression
+
+Before adding variables to the regression model, we must determine what other data strongly correlates with mpg.
+
+```{r correlation}
+data(mtcars)    # resets all data to numerical to work with cor() function
+cor(mtcars)[1,]
+```
+
+As we can see, the variables that strongly correlate with mpg are number of cylinders (*cyl*), displacement (*disp*), gross horsepower (*hp*), and 1000 lbs of weight (*wt*). *Figure 2, Appendix A* gives a visualization of these correlations. Now that we found the other variables strongly affecting the *mpg*, we can create a new linear model
+
+```{r multivar_lm}
+for(i in c(2,8:11)){    # Changes the class of all the categorical variables back to factors
+  mtcars[,i] <- as.factor(mtcars[,i])
+}
+mtcars$am <- factor(mtcars$am,levels=c(0,1),labels=c("Automatic", "Manual"))
+
+multivar <- lm(mpg ~ am + wt + cyl + disp + hp, data = mtcars)
+multivar_lm <- summary(multivar)
+multivar_lm
+```
+
+Now, including all other factors, we see that the difference in *mpg* between automatic and manual transmissions is **`r multivar_lm$coef[2,1]`**, much smaller than the **`r slm$coef[2,1]`** in the SLM. We see *Multiple R-squared* is **`r multivar_lm$r.squared`**, meaning that this model fits 86.6% of the regression model. The residual values (*Figure 3 - Apendix A*) show us that the data follows the normal curve. This confirms a **1.8** mpg increase in gas milage, with a **`r multivar_lm$sigma`** uncertainty, when using a manual transmission vs an automatic transmission.
+
+#Appendix A
+###*Figure 1*: MPG by Transmission Type
+```{r boxlot}
+boxplot(
+  mpg ~ am, data = mtcars,
+  xlab = "Transmission Type", ylab = "MPG"
+)
+```
+
+###*Figure 2*: Correlation Between All Variables
+```{r correlation plot}
+pairs(mpg ~ ., data = mtcars)
+```
+
+###*Figure 3*: Residual Values
+```{r resid_values}
+par(mfrow=c(2,2))
+plot(multivar)
+```
